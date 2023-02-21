@@ -139,19 +139,6 @@ void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
 #endif
 
     chan_ledcount = chan_ledcount_in;
-    memcpy(rgb_data, rgb_data_in, channel_count * chan_ledcount_in * sizeof(int));
-
-#if 0
-    for (int led = 0; led < chan_ledcount_in; led++)
-    {
-        for (int channel = 0; channel < channel_count; channel++)
-        {
-            printf("%8d ", rgb_data[led][channel]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-#endif
 
     signal(SIGINT, terminate);
     map_devices();
@@ -161,7 +148,7 @@ void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
     printf("%s %u LED%s per channel, %u channels\n", testmode ? "Testing" : "Setting",
            chan_ledcount, chan_ledcount == 1 ? "" : "s", LED_NCHANS);
     for (int n = 0; n < chan_ledcount; n++)
-        rgb_txdata(rgb_data[n], &tx_buffer[LED_TX_OSET(n)]);
+        rgb_txdata(rgb_data_in + n * channel_count, &tx_buffer[LED_TX_OSET(n)]);
 #if LED_NCHANS <= 8
     swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
 #endif
