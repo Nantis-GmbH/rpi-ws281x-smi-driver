@@ -54,7 +54,7 @@
 #define LED_PREBITS     4   // Number of zero bits before LED data
 #define LED_POSTBITS    4   // Number of zero bits after LED data
 #define BIT_NPULSES     4   // Number of O/P pulses per LED bit
-#define CHAN_MAXLEDS    1000  // Maximum number of LEDs per channel
+#define CHAN_MAXLEDS 444    // Maximum number of LEDs per channel
 #define CHASE_MSEC      100 // Delay time for chaser light test
 #define REQUEST_THRESH  2   // DMA request threshold
 #define DMA_CHAN        10  // DMA channel to use
@@ -121,6 +121,58 @@ void terminate(int sig);
 void init_smi(int width, int ns, int setup, int hold, int strobe);
 void setup_smi_dma(MEM_MAP *mp, int nsamp);
 void start_smi(MEM_MAP *mp);
+
+void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
+{
+#if 0
+    printf("Channel count: %d\n", channel_count);
+    printf("LED count per channel: %d\n", chan_ledcount_in);
+    for (int led = 0; led < chan_ledcount_in; led++)
+    {
+        for (int channel = 0; channel < channel_count; channel++)
+        {
+            printf("%8d ", rgb_data_in[led * channel_count + channel]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+#endif
+
+    chan_ledcount = chan_ledcount_in;
+    memcpy(rgb_data, rgb_data_in, channel_count * chan_ledcount_in * sizeof(int));
+
+#if 0
+    for (int led = 0; led < chan_ledcount_in; led++)
+    {
+        for (int channel = 0; channel < channel_count; channel++)
+        {
+            printf("%8d ", rgb_data[led][channel]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+#endif
+
+    signal(SIGINT, terminate);
+    map_devices();
+    init_smi(LED_NCHANS > 8 ? SMI_16_BITS : SMI_8_BITS, SMI_TIMING);
+    map_uncached_mem(&vc_mem, VC_MEM_SIZE);
+    setup_smi_dma(&vc_mem, TX_BUFF_LEN(chan_ledcount));
+    printf("%s %u LED%s per channel, %u channels\n", testmode ? "Testing" : "Setting",
+           chan_ledcount, chan_ledcount == 1 ? "" : "s", LED_NCHANS);
+    for (int n = 0; n < chan_ledcount; n++)
+        rgb_txdata(rgb_data[n], &tx_buffer[LED_TX_OSET(n)]);
+#if LED_NCHANS <= 8
+    swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
+#endif
+    memcpy(txdata, tx_buffer, TX_BUFF_SIZE(chan_ledcount));
+    enable_dma(DMA_CHAN);
+    start_smi(&vc_mem);
+    usleep(10);
+    while (dma_active(DMA_CHAN))
+        usleep(10);
+    terminate(0);
+}
 
 int main(int argc, char *argv[])
 {
@@ -238,6 +290,14 @@ void rgb_txdata(int *rgbs, TXDATA_T *txd)
 {
     int i, n, msk;
 
+#if 0
+    for (i = 0; i < LED_NCHANS; i++)
+    {
+        printf("%d ", rgbs[i]);
+    }
+    printf("\n");
+#endif
+
     // For each bit of the 24-bit RGB values..
     for (n=0; n<LED_NBITS; n++)
     {
@@ -312,7 +372,7 @@ void terminate(int sig)
     unmap_periph_mem(&smi_regs);
     unmap_periph_mem(&dma_regs);
     unmap_periph_mem(&gpio_regs);
-    exit(0);
+    // exit(0);
 }
 
 // Initialise SMI, given data width, time step, and setup/hold/strobe counts
