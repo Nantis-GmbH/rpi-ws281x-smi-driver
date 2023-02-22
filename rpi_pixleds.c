@@ -40,6 +40,7 @@
 #include <ctype.h>
 #include "rpi_dma_utils.h"
 #include "rpi_smi_defs.h"
+#include <sys/time.h>
 
 #if PHYS_REG_BASE==PI_4_REG_BASE        // Timings for RPi v4 (1.5 GHz)
 #define SMI_TIMING       10, 15, 30, 15    // 400 ns cycle time
@@ -137,6 +138,8 @@ void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
     }
     printf("\n");
 #endif
+    struct timeval tv1, tv2;
+    gettimeofday(&tv1, NULL);
 
     chan_ledcount = chan_ledcount_in;
 
@@ -159,6 +162,11 @@ void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
     while (dma_active(DMA_CHAN))
         usleep(10);
     terminate(0);
+
+    gettimeofday(&tv2, NULL);
+    printf("Total time = %f seconds\n",
+           (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 +
+               (double)(tv2.tv_sec - tv1.tv_sec));
 }
 
 int main(int argc, char *argv[])
