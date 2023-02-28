@@ -122,8 +122,30 @@ void init_smi(int width, int ns, int setup, int hold, int strobe);
 void setup_smi_dma(MEM_MAP *mp, int nsamp);
 void start_smi(MEM_MAP *mp);
 
+void init(int chan_ledcount_in)
+{
+    map_devices();
+    init_smi(LED_NCHANS > 8 ? SMI_16_BITS : SMI_8_BITS, SMI_TIMING);
+    map_uncached_mem(&vc_mem, VC_MEM_SIZE);
+    setup_smi_dma(&vc_mem, TX_BUFF_LEN(chan_ledcount_in));
+    printf("%s %u LED%s per channel, %u channels\n", testmode ? "Testing" : "Setting",
+           chan_ledcount_in, chan_ledcount_in == 1 ? "" : "s", LED_NCHANS);
+}
+
+void deinit()
+{
+    terminate(0);
+}
+
 void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
 {
+#if 0
+    for (int i = 0; i < chan_ledcount_in * channel_count; i++)
+    {
+        printf("%d ", rgb_data_in[i]);
+    }
+    printf("\n");
+#endif
 #if 0
     printf("Channel count: %d\n", channel_count);
     printf("LED count per channel: %d\n", chan_ledcount_in);
@@ -138,27 +160,17 @@ void show(int *rgb_data_in, int chan_ledcount_in, int channel_count)
     printf("\n");
 #endif
 
-    chan_ledcount = chan_ledcount_in;
+    if (dma_active(DMA_CHAN))
+        return;
 
-    signal(SIGINT, terminate);
-    map_devices();
-    init_smi(LED_NCHANS > 8 ? SMI_16_BITS : SMI_8_BITS, SMI_TIMING);
-    map_uncached_mem(&vc_mem, VC_MEM_SIZE);
-    setup_smi_dma(&vc_mem, TX_BUFF_LEN(chan_ledcount));
-    printf("%s %u LED%s per channel, %u channels\n", testmode ? "Testing" : "Setting",
-           chan_ledcount, chan_ledcount == 1 ? "" : "s", LED_NCHANS);
-    for (int n = 0; n < chan_ledcount; n++)
+    for (int n = 0; n < chan_ledcount_in; n++)
         rgb_txdata(rgb_data_in + n * channel_count, &tx_buffer[LED_TX_OSET(n)]);
 #if LED_NCHANS <= 8
-    swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
+    swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount_in));
 #endif
-    memcpy(txdata, tx_buffer, TX_BUFF_SIZE(chan_ledcount));
+    memcpy(txdata, tx_buffer, TX_BUFF_SIZE(chan_ledcount_in));
     enable_dma(DMA_CHAN);
     start_smi(&vc_mem);
-    usleep(10);
-    while (dma_active(DMA_CHAN))
-        usleep(10);
-    terminate(0);
 }
 
 int main(int argc, char *argv[])
